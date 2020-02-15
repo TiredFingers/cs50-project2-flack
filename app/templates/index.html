@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome</title>
+    <style>
+		*{
+			padding: 0;
+			margin: 0;
+		}
+		.padding-5px{
+			padding: 5px;
+		}
+		.padding-10px{
+			padding: 10px;
+		}
+		header{
+			width: 100%;
+			height: 70px;
+			background-color: #ededed;
+			color: black;
+		}
+		footer{
+		}
+		#message-form{
+			width: 80%;
+			height: 100%;
+			padding: 10px;
+			text-align: center;
+		}
+		#create-room-form{
+			width: 20%;
+			float: left;
+			height: 100%;
+			padding: 10px;
+			text-align: center;
+		}
+		#user-panel{
+			background-color: #ededed;
+			position: fixed;
+			width: 100%;
+			height: 100px;
+			right: 0px;
+			left: 0px;
+			bottom: 0px;
+		}
+		#p-greeting{
+		}
+        #username-form{
+            display: none;
+        }
+        #user-interface{
+            display: none;
+        }
+		.ui-divs{
+			height: 100%;
+			min-height: 300px;
+			float: left;
+		}
+		.float-left{
+			float:left;
+		}
+		.float-right{
+			float: right;
+		}
+		.clear{
+			clear: both;
+		}
+		#left-side{
+			background-color: white;
+			position: fixed;
+			bottom: 100px;
+			top: 70px;
+			left: 0px;
+			height: 100%;
+			width: 20%;
+			float: left;
+		}
+		#messages-container{
+			width: 80%;
+			height: 100%;
+			background-color: #f8f9fa;
+			float: left;
+			position: fixed;
+			top: 70px;
+			bottom: 100px;
+			right: 0px;
+			left: 20%;
+		}
+		#rooms-list-cont{
+			min-height: 300px;
+		}
+		#messages{
+			width: 80%;
+		}
+		.room-name-span{
+			border-bottom: 1px dashed black;
+		}
+		.room-name-span:hover{
+			border-bottom: 1px white;
+			cursor: pointer;
+		}
+		.room-name-span-inactive{
+			
+		}
+		.msg-container{
+			min-height: 80px;
+			width: 100%;
+		}
+		.msg-username{
+			width: 50%;
+		}
+		.msg-date{
+			width: 40%;
+			margin-left: 10%;
+		}
+		.msg-text{
+			padding-top: 40px;
+			width: 100%;
+
+		}
+		.msg-in{
+			float: left;
+		}
+		.msg-out{
+			float: right;
+		}
+		.roomlist-room-elem{
+			width: 100%;
+			min-height: 50px;
+			padding: 5px;
+			border-bottom: 1px solid grey;
+			text-align: center;
+		}
+		.roomlist-room-elem:hover{
+			cursor: pointer;
+			background-color: #e8e8e8;
+		}
+    </style>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
+    <script type="text/javascript" charset="utf-8">
+		
+		let socket = io();
+        let username = "anonymous";
+		let msgText, sendMsgBtn, msgMetaRoomName, messages, roomsList, lastAddedRoom, currentRoom, 
+			roomNamePlace; //попытка избежать поиска элементов при каждом создании комнаты
+		
+		function roomClickHandler(action){
+			
+			let inactiveRoomNames = document.getElementsByClassName("room-name-span-inactive");
+			
+			for(let i = 0; i < inactiveRoomNames.length; i++){
+				inactiveRoomNames[i].className = "room-name-span";
+			}
+			
+			let lastRoom = localStorage.getItem("room-name");
+			
+			if(lastRoom != null){
+				
+				socket.emit("leave", {room: lastRoom})
+			}
+			
+			
+			messages.innerText = "";
+			action.path[0].className = "room-name-span-inactive";
+			msgMetaRoomName.value = action.path[0].innerText;
+			msgText.disabled = false;
+			sendMsgBtn.disabled = false;
+			
+			localStorage.setItem("room-name", msgMetaRoomName.value);
+			currentRoom = msgMetaRoomName.value;
+			roomNamePlace.innerText = currentRoom;
+			
+			socket.emit("join", {username: username, room: msgMetaRoomName.value});
+			
+		}
+		
+		function roomElemClickHandler(action){
+			console.log("roomElemClickHandler");
+			
+			let inactiveRooms = document.getElementsByClassName("room-inactive");
+			let lastRoom = localStorage.getItem("room-name");
+			
+			for(let i = 0; i < inactiveRooms.length; i++){
+				inactiveRooms[i].className = "roomlist-room-elem room-active";
+			}
+			
+			if(lastRoom != null){
+				
+				socket.emit("leave", {room: lastRoom})
+			}
+			
+			messages.innerText = "";
+			this.className = "roomlist-room-elem room-inactive";
+			msgMetaRoomName.value = this.children[0].innerText;
+			msgText.disabled = false;
+			sendMsgBtn.disabled = false;
+			
+			localStorage.setItem("room-name", this.children[0].innerText);
+			currentRoom = this.children[0].innerText;
+			roomNamePlace.innerText = currentRoom;
+			
+			socket.emit("join", {username: username, room: this.children[0].innerText});
+		}
+		
+		function updateRooms(data){
+			
+			roomsList.innerHTML = "";
+			
+			let roomElem;
+			let lastRoom = localStorage.getItem("room-name");
+			
+			for(room in data){
+				
+				roomElem = appendRoom2(room);
+				
+				if(room === lastRoom){
+					
+					let click = new Event("click");
+					
+					roomElem.dispatchEvent(click);
+				}
+				
+			}
+		}
+		
+        function updateRoomsUl(data){
+
+            roomsList.innerHTML = "";
+
+			let lastRoom = localStorage.getItem("room-name");
+			
+			for(room in data){
+				
+				let li = document.createElement("li");
+				let span = document.createElement("span");
+				
+				span.className = "room-name-span";
+				li.className = "rooms-li";
+				span.innerText = room;
+				
+				li.appendChild(span);
+				li.addEventListener("click", roomClickHandler);
+				
+                roomsList.appendChild(li);
+				
+				if(room === lastRoom){
+					
+					let click = new Event("click");
+					
+					li.dispatchEvent(click);
+				}
+			}
+			
+        }
+		
+		function appendMsg(msg, msgClass){
+			
+			let msgContainer = document.createElement("div");
+			let msgShift = document.createElement("div");
+			let usernameContainer = document.createElement("div");
+			let dateContainer = document.createElement("div");
+			let textContainer = document.createElement("div");
+			
+			msgContainer.className = "msg-container";
+			msgShift.className = msgClass;
+			usernameContainer.className = "msg-username float-left";
+			dateContainer.className = "msg-date float-left";
+			textContainer.className = "msg-text";
+			
+			usernameContainer.innerText = msg[0];
+			textContainer.innerText = msg[1];
+			dateContainer.innerText = msg[2];
+			
+			msgShift.appendChild(usernameContainer);
+			msgShift.appendChild(dateContainer);
+			msgShift.appendChild(textContainer);
+			msgContainer.appendChild(msgShift);
+			
+			messages.appendChild(msgContainer);
+		}
+		
+		function appendRoom2(room){
+			
+			let roomElem,
+				roomName;
+				
+			roomElem = document.createElement("div");
+			roomName = document.createElement("h3");
+				
+			roomElem.className = "roomlist-room-elem";
+			roomName.className = "roomlist-room-name";
+				
+			roomName.innerText = room;
+				
+			roomElem.appendChild(roomName);
+				
+			roomElem.addEventListener("click", roomElemClickHandler);
+				
+			roomsList.appendChild(roomElem);
+			
+			return roomElem;
+		}
+		
+		function appendRoom(room){
+			
+			let li = document.createElement("li");
+			let span = document.createElement("span");
+				
+			span.className = "room-name-span";
+			li.className = "rooms-li";
+			span.innerText = room;
+				
+			li.appendChild(span);
+			li.addEventListener("click", roomClickHandler);
+				
+            roomsList.appendChild(li);
+			lastAddedRoom = room;
+		}
+		
+        socket.on('connect', function() {
+            socket.emit('service-message', {data: 'I\'m connected!'});
+        });
+
+        socket.on("roomslist", function(data){
+			/*
+			if(data["username"] !== username){
+				updateRoomsUl(data["rooms"]);
+			}
+			*/
+			if(data["username"] !== username){
+				updateRooms(data["rooms"]);
+			}
+        });
+		
+		socket.on("message", function(msg){
+			
+			let msgClass = "msg-in";
+			
+			if(msg[0] === username){
+				msgClass = "msg-out";
+			}
+			
+			appendMsg(msg, msgClass);
+		});
+		
+		socket.on("all-room-msgs", function(data){
+			
+			if(data["username"] === username){
+				
+				let msgClass;
+				
+				msgs = data["messages"];
+				
+				for(let i = 0; i < msgs.length; i++){
+					
+					if(msgs[i][0] === username){
+						msgClass = "msg-out";
+					}
+					else{
+						msgClass = "msg-in";
+					}
+					
+					appendMsg(msgs[i], msgClass);
+				}
+			}
+		});
+
+        document.addEventListener("DOMContentLoaded", function(){
+
+            let usernamePlace = document.getElementById("username-place");
+            let usernameSubmitButton = document.getElementById("username-submit");
+            let usernameForm = document.getElementById("username-form");
+            let userInterface = document.getElementById("user-interface");
+            let createRoomButton = document.getElementById("create-room");
+			roomNamePlace = document.getElementById("room-name-place");
+			roomsList = document.getElementById("rooms-list");
+			msgText = document.getElementById("msg-text");
+			sendMsgBtn = document.getElementById("send-msg-btn");
+			msgMetaRoomName = document.getElementById("msg-meta-name");
+			messages = document.getElementById("messages");
+			
+            if(localStorage.getItem("username") === null){
+                usernamePlace.innerText = username;
+                usernameForm.style.display = "block";
+            }
+            else{
+				username = localStorage.getItem("username");
+                usernamePlace.innerText = username;
+                userInterface.style.display = "block";
+                socket.emit("update-user", {username: username});
+				socket.emit("get-rooms", {username: "undefined"});
+
+            }
+			
+			sendMsgBtn.addEventListener("click", function(){
+
+				if(msgText.value.length <= 140 && msgText.value.length > 0){
+					
+					socket.emit("message", {text: msgText.value, room: msgMetaRoomName.value, user: username})
+					msgText.value = "";
+				}
+			});
+			
+            usernameSubmitButton.addEventListener("click", function(){
+
+                let newUsername = document.getElementById("input-username").value;
+
+                if(newUsername.length > 3){
+
+                    socket.emit("new-user", {data: newUsername}, function(data){
+
+                        if(data.hasOwnProperty("error")){
+                            alert("user exists");
+                        }
+                        else{
+							username = newUsername;
+                            localStorage.setItem("username", newUsername);
+                            usernameForm.style.display = "none";
+                            usernamePlace.innerText = newUsername;
+                            userInterface.style.display = "block";
+							socket.emit("get-rooms", {username: "undefined"});
+                        }
+                    });
+                }
+                else{
+                    alert("Username length must be grater then 3");
+                }
+            });
+
+            createRoomButton.addEventListener("click", function(){
+				
+				let roomNameField = document.getElementById("room-name");
+
+                if(roomNameField.value.length >= 3){
+
+                    socket.emit("create-room", {room: roomNameField.value}, function(response){
+
+                        if(response.hasOwnProperty("error")){
+
+                            alert(response["error"]);
+                        }
+                        else{
+							
+							appendRoom2(response["room"]);							
+							
+							roomNameField.value = "";
+							
+							socket.emit("get-rooms", {username: username});
+                        }
+
+                    });
+                }
+                else{
+                    alert("room name must be grater or equal to 3");
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <header>
+		<h2 class="padding-5px">Flack</h2>
+        <p id="p-greeting" 
+			class="padding-5px">Hello, <span id="username-place"></span>
+			
+			You are in <span id="room-name-place"></span> room.
+			</p>
+    </header>
+
+    <div id="user-interface">
+		
+		<div id="left-side" class="ui-divs">
+			<div id="rooms-list-cont">
+				<div id="rooms-list">
+				
+				</div>
+				<!--<ul id="rooms-list">
+
+				</ul>-->
+			</div>
+
+			
+		</div>
+		<div id="messages-container" class="ui-divs">
+			<div id="messages"></div>
+			
+			
+		</div>
+		<span class="clear"></span>
+    </div>
+	<div id="user-panel">
+		<div id="create-room-form">
+				<input type="text" id="room-name" />
+				<button id="create-room">Create room</button>
+		</div>
+		<div id="message-form">
+				<input type="text" id="msg-text" disabled />
+				<input type="hidden" id="msg-meta-name" />
+				<button id="send-msg-btn" disabled>Send</button>
+		</div>
+	</div>
+    <footer>
+        <div id="username-form">
+            <input type="text" id="input-username" />
+            <button id="username-submit">LogIn</button>
+        </div>
+    </footer>
+</body>
+</html>
